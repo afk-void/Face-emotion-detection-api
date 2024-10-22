@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Face Emotion Recognition Web-App</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to bottom right, #4e54c8, #8f94fb);
+            color: #fff;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 36px;
+            color: #fff;
+        }
+        #video, #canvas {
+            border: 3px solid #fff;
+            border-radius: 12px;
+            display: block;
+            margin: 20px auto;
+            box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.2);
+        }
+        #prediction {
+            margin-top: 20px;
+            font-size: 26px;
+            font-weight: bold;
+            background-color: #1e1e1e;
+            color: #00e676;
+            padding: 15px 25px;
+            border-radius: 12px;
+            display: inline-block;
+            box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.3);
+        }
+        #error {
+            color: #ff6f61;
+            margin-top: 10px;
+            font-size: 20px;
+        }
+        #controls {
+            margin-top: 20px;
+        }
+        .btn {
+            background-color: #00bcd4;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 0 12px;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .btn:hover {
+            background-color: #0097a7;
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body>
+    <h1>Real-time Face Emotion Recognition</h1>
+    <video id="video" width="430" height="330" autoplay></video>
+    <canvas id="canvas" width="430" height="330"></canvas>
+    <div id="prediction">Initializing...</div>
+    <div id="error"></div>
+    <div id="controls">
+        <button class="btn" id="start">Start Recognition</button>
+        <button class="btn" id="stop">Stop Recognition</button>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const predictionDiv = document.getElementById('prediction');
+        const errorDiv = document.getElementById('error');
+        const context = canvas.getContext('2d');
+        let intervalId = null;
+        let recognitionStopped = false;
+
+        // Function to start video stream from the webcam
+        function startVideoStream() {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    video.srcObject = stream;
+                })
+                .catch(error => {
+                    console.error('Error accessing the webcam:', error);
+                    showError('Unable to access webcam. Please check your permissions.');
+                });
+        }
+
+        // Function to capture and send frame for emotion prediction
+        function captureFrameAndPredict() {
+            if (recognitionStopped) return; // Stop processing if recognition has stopped
+
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const canvasData = canvas.toDataURL('image/jpeg', 0.8);
+
+            fetch('https://2qvkdqg4-5000.inc1.devtunnels.ms/predictemotion', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ image: canvasData })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    displayPrediction(data);
+                }
+            })
+            .catch(error => {
+                console.error('Error predicting emotion:', error);
+                showError('Error predicting emotion. Please try again.');
+            });
+        }
+
+        // Function to display the emotion prediction
+        function displayPrediction(data) {
+            const { emotion, x1, y1, x2, y2 } = data;
+            predictionDiv.textContent = `Predicted Emotion: ${emotion}`;
+            errorDiv.textContent = ''; // Clear any previous errors
+
+            // Clear the canvas and redraw the video frame
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Draw the bounding box around the face
+            context.strokeStyle = 'red';
+            context.lineWidth = 2;
+            const width = parseInt(x2);
+            const height = parseInt(y2);
+            context.strokeRect(parseInt(x1), parseInt(y1), width, height);
+
+            // Display the emotion label above the bounding box
+            context.fillStyle = 'yellow';
+            context.font = '20px Arial';
+            context.fillText(emotion, parseInt(x1), parseInt(y1) - 10);
+        }
+
+        // Function to display errors to the user
+        function showError(message) {
+            predictionDiv.textContent = 'Error';
+            errorDiv.textContent = message;
+        }
+
+        // Initialize the app
+        function init() {
+            startVideoStream();
+            
+        }
+        // Start the emotion recognition
+        document.getElementById('start').addEventListener('click', () => {
+            if (!intervalId) {
+                recognitionStopped = false; // Reset recognitionStopped
+                intervalId = setInterval(captureFrameAndPredict, 300);
+                predictionDiv.textContent = 'Initializing...';
+                errorDiv.textContent = '';
+            }
+        });
+
+        // Stop the emotion recognition
+        document.getElementById('stop').addEventListener('click', () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+                recognitionStopped = true; // Set the flag to true
+                predictionDiv.textContent = 'Recognition Ended';
+                errorDiv.textContent = '';
+                video.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
+            }
+        });
+
+        // Run the app
+        init();
+    </script>
+</body>
+</html>
