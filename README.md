@@ -26,7 +26,7 @@ To run this project locally, follow these steps:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Demodotcom/Face-emotion-detection-api.git
+   git clone https://github.com/afk-void/Face-emotion-detection-api.git
 
 2. Navigate to the project directory:
   cd Face-emotion-webp
